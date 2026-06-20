@@ -1,6 +1,6 @@
 workflows:
-  android-apk-from-zip:
-    name: Build Nawader Firebase APK
+  android-arm64-small-apk-from-zip:
+    name: Build Small Android APK - ARM64
     max_build_duration: 60
     environment:
       flutter: stable
@@ -29,18 +29,16 @@ workflows:
           flutter create . --platforms=android
           flutter pub get
 
-      - name: Configure Android package and Firebase
+      - name: Configure Android package and internet permission
         script: |
           set -e
           cd "$PROJECT_DIR"
           if [ -f android_patch/app/src/main/AndroidManifest.xml ]; then
             cp -f android_patch/app/src/main/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
           fi
-          if [ -f android_patch/app/google-services.json ]; then
-            cp -f android_patch/app/google-services.json android/app/google-services.json
-          fi
           python3 - <<'PY'
           from pathlib import Path
+          import re
           package = 'com.nawader.nawader_minshawi'
           manifest = Path('android/app/src/main/AndroidManifest.xml')
           txt = manifest.read_text()
@@ -53,7 +51,6 @@ workflows:
               if not p.exists():
                   continue
               s = p.read_text()
-              import re
               s = re.sub(r'namespace\s*=\s*"[^"]+"', f'namespace = "{package}"', s)
               s = re.sub(r'applicationId\s*=\s*"[^"]+"', f'applicationId = "{package}"', s)
               s = re.sub(r'namespace\s+"[^"]+"', f'namespace "{package}"', s)
@@ -65,11 +62,12 @@ workflows:
               kt.write_text(src)
           PY
 
-      - name: Build release APK
+      - name: Build small ARM64 release APK
         script: |
           set -e
           cd "$PROJECT_DIR"
-          flutter build apk --release
+          flutter build apk --release --target-platform android-arm64 --split-per-abi --obfuscate --split-debug-info=build/symbols
+          ls -lh build/app/outputs/flutter-apk/
 
     artifacts:
-      - extracted/**/build/app/outputs/flutter-apk/app-release.apk
+      - extracted/**/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
