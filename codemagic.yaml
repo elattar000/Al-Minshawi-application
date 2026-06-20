@@ -1,36 +1,73 @@
 workflows:
   android-apk-from-zip:
-    name: Build Android APK from ZIP
+    name: Build Nawader Firebase APK
     max_build_duration: 60
     environment:
       flutter: stable
 
     scripts:
-      - name: Find and unzip project
+      - name: Unzip Flutter project
         script: |
+          set -e
           ls -la
           ZIP_FILE=$(ls *.zip | head -n 1)
           echo "ZIP file: $ZIP_FILE"
+          rm -rf extracted
           unzip -o "$ZIP_FILE" -d extracted
           PROJECT_DIR=$(find extracted -name pubspec.yaml -exec dirname {} \; | head -n 1)
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "pubspec.yaml not found inside ZIP"
+            exit 1
+          fi
           echo "Project dir: $PROJECT_DIR"
           echo "PROJECT_DIR=$PROJECT_DIR" >> $CM_ENV
 
-      - name: Prepare Flutter project
+      - name: Create Android files and install packages
         script: |
+          set -e
           cd "$PROJECT_DIR"
           flutter create . --platforms=android
           flutter pub get
 
-      - name: Apply Android patch
+      - name: Configure Android package and Firebase
         script: |
+          set -e
           cd "$PROJECT_DIR"
           if [ -f android_patch/app/src/main/AndroidManifest.xml ]; then
             cp -f android_patch/app/src/main/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
           fi
+          if [ -f android_patch/app/google-services.json ]; then
+            cp -f android_patch/app/google-services.json android/app/google-services.json
+          fi
+          python3 - <<'PY'
+          from pathlib import Path
+          package = 'com.nawader.nawader_minshawi'
+          manifest = Path('android/app/src/main/AndroidManifest.xml')
+          txt = manifest.read_text()
+          permission = '<uses-permission android:name="android.permission.INTERNET" />'
+          if permission not in txt:
+              txt = txt.replace('<manifest xmlns:android="http://schemas.android.com/apk/res/android">', '<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n    ' + permission)
+          manifest.write_text(txt)
+          for gradle_name in ['android/app/build.gradle', 'android/app/build.gradle.kts']:
+              p = Path(gradle_name)
+              if not p.exists():
+                  continue
+              s = p.read_text()
+              import re
+              s = re.sub(r'namespace\s*=\s*"[^"]+"', f'namespace = "{package}"', s)
+              s = re.sub(r'applicationId\s*=\s*"[^"]+"', f'applicationId = "{package}"', s)
+              s = re.sub(r'namespace\s+"[^"]+"', f'namespace "{package}"', s)
+              s = re.sub(r'applicationId\s+"[^"]+"', f'applicationId "{package}"', s)
+              p.write_text(s)
+          for kt in Path('android/app/src/main/kotlin').rglob('MainActivity.kt'):
+              src = kt.read_text()
+              src = re.sub(r'^package .+$', f'package {package}', src, flags=re.M)
+              kt.write_text(src)
+          PY
 
-      - name: Build APK
+      - name: Build release APK
         script: |
+          set -e
           cd "$PROJECT_DIR"
           flutter build apk --release
 
