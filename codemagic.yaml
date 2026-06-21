@@ -33,8 +33,8 @@ workflows:
         script: |
           set -e
           cd "$PROJECT_DIR"
-          if [ -f android_patch/app/src/main/AndroidManifest.xml ]; then
-            cp -f android_patch/app/src/main/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
+          if [ -d android_patch/app ]; then
+            cp -R android_patch/app/* android/app/
           fi
           python3 - <<'PY'
           from pathlib import Path
@@ -72,7 +72,7 @@ workflows:
         script: |
           set -e
           cd "$PROJECT_DIR"
-          flutter build apk --release --target-platform android-arm64 --split-per-abi --obfuscate --split-debug-info=build/symbols
+          flutter build apk --release --target-platform android-arm64 --split-per-abi --obfuscate --split-debug-info=build/symbols --dart-define=OTP_API_BASE_URL=${OTP_API_BASE_URL:-https://ais-pre-xuhvgtko4beauqfeijeflu-226377500595.europe-west2.run.app} --dart-define=OTP_API_KEY=${OTP_API_KEY:-minshawi_otp_2026_secure_key}
           ls -lh build/app/outputs/flutter-apk/
 
     artifacts:
