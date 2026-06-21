@@ -65,28 +65,6 @@ workflows:
               src = kt.read_text()
               src = re.sub(r'^package .+$', f'package {package}', src, flags=re.M)
               kt.write_text(src)
-              
-          # سكريبت ذكي لحقن إضافات الـ Google Services داخل ملفات الـ Gradle تلقائياً
-          proj_gradle = Path('android/build.gradle')
-          if proj_gradle.exists():
-              content = proj_gradle.read_text()
-              if 'plugins {' in content:
-                  plugin_str = '\n    id "com.google.gms.google-services" version "4.4.1" apply false'
-                  content = content.replace('plugins {', f'plugins {{{plugin_str}')
-              else:
-                  dep_str = "\n        classpath 'com.google.gms:google-services:4.4.1'"
-                  content = re.sub(r'dependencies\s*\{', f'dependencies {{{dep_str}', content)
-              proj_gradle.write_text(content)
-
-          app_gradle = Path('android/app/build.gradle')
-          if app_gradle.exists():
-              content = app_gradle.read_text()
-              if 'plugins {' in content:
-                  plugin_str = '\n    id "com.google.gms.google-services"'
-                  content = content.replace('plugins {', f'plugins {{{plugin_str}')
-              else:
-                  content += "\napply plugin: 'com.google.gms.google-services'\n"
-              app_gradle.write_text(content)
           PY
 
       - name: Build small ARM64 release APK
